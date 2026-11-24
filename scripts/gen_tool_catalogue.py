@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate TOOLS.md - the full tool catalogue of openstack-mcp-guarded.
+"""Regenerate TOOLS.md - the full tool catalogue of mcp-openstack.
 
 Enumerates tools per upstream tool class (exact categories), splits them
 by the current policy, and rewrites TOOLS.md in the repo root.
@@ -93,7 +93,7 @@ def main() -> int:
     blocked = {n: t for n, t in tools.items() if not policy.is_allowed(n)}
 
     lines: list[str] = []
-    lines.append("# Tool catalogue — openstack-mcp-guarded\n")
+    lines.append("# Tool catalogue — mcp-openstack\n")
     lines.append(
         f"> Full upstream catalogue: **{len(tools)} tools** · "
         f"visible in read-only mode: **{len(allowed)}** · "

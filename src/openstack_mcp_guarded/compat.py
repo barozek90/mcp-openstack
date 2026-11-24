@@ -23,7 +23,7 @@ import logging
 
 from pydantic.fields import FieldInfo
 
-logger = logging.getLogger("openstack-mcp-guarded")
+logger = logging.getLogger("mcp-openstack")
 
 
 def patch_upstream_quirks() -> None:
@@ -45,6 +45,6 @@ def _patch_volume_attachment_delete_on_termination() -> None:
     volume_attachment.model_rebuild(force=True)
     _compute.Server.model_rebuild(force=True)
     logger.debug(
-        "openstack-mcp-guarded: patched Server.VolumeAttachment."
+        "mcp-openstack: patched Server.VolumeAttachment."
         "delete_on_termination to tolerate null"
     )

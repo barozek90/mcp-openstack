@@ -1,4 +1,4 @@
-"""Policy engine for openstack-mcp-guarded.
+"""Policy engine for mcp-openstack.
 
 Defines which MCP tools are allowed to be listed and executed.
 
@@ -11,7 +11,7 @@ Two modes:
 
 Policy file location (first match wins):
 1. ``$OS_MCP_GUARD_POLICY``
-2. ``~/.config/openstack-mcp-guarded/policy.yaml``
+2. ``~/.config/mcp-openstack/policy.yaml``
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from typing import Any
 
 import yaml
 
-logger = logging.getLogger("openstack-mcp-guarded")
+logger = logging.getLogger("mcp-openstack")
 
 # Tools that manage the cloud session itself. They never touch cloud
 # resources, so they are always allowed (also needed for the no-cloud
@@ -48,7 +48,7 @@ MODE_CUSTOM = "custom"
 _VALID_MODES = (MODE_READ_ONLY, MODE_CUSTOM)
 
 DEFAULT_POLICY_PATH = (
-    Path.home() / ".config" / "openstack-mcp-guarded" / "policy.yaml"
+    Path.home() / ".config" / "mcp-openstack" / "policy.yaml"
 )
 POLICY_PATH_ENV = "OS_MCP_GUARD_POLICY"
 

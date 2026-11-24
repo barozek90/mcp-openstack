@@ -1,4 +1,4 @@
-# Tool catalogue — openstack-mcp-guarded
+# Tool catalogue — mcp-openstack
 
 > Full upstream catalogue: **135 tools** · visible in read-only mode: **66** · blocked: **69**
 

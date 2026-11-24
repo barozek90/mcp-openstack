@@ -82,6 +82,6 @@ def main() -> None:
     try:
         mcp = create_mcp()
     except ConfigDirError as exc:
-        print(f"[openstack-mcp-guarded] ERROR {exc}", file=sys.stderr, flush=True)
+        print(f"[mcp-openstack] ERROR {exc}", file=sys.stderr, flush=True)
         raise SystemExit(1) from exc
     mcp.run(transport="stdio")

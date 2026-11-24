@@ -23,7 +23,7 @@ from fastmcp.server.middleware import Middleware, MiddlewareContext
 
 from openstack_mcp_guarded.policy import SESSION_TOOLS, Policy
 
-logger = logging.getLogger("openstack-mcp-guarded")
+logger = logging.getLogger("mcp-openstack")
 
 
 def _stderr(msg: str) -> None:
@@ -76,11 +76,11 @@ class PolicyMiddleware(Middleware):
     ) -> ToolError:
         """Build the ToolError and emit the audit line."""
         _stderr(
-            f"[openstack-mcp-guarded] BLOCKED tool='{tool_name}' "
+            f"[mcp-openstack] BLOCKED tool='{tool_name}' "
             f"mode='{self._policy.mode}' reason='{reason}'"
         )
         msg = (
-            f"Blocked by openstack-mcp-guarded policy (mode: "
+            f"Blocked by mcp-openstack policy (mode: "
             f"{self._policy.mode}): tool '{tool_name}' is not permitted. "
             f"{reason}"
         )
@@ -117,7 +117,7 @@ class PolicyMiddleware(Middleware):
                 f"not on the '{self._policy.mode}' allowlist",
                 hint=(
                     "Read-only tools (get_*) are available. Ask the user to "
-                    "extend the policy file (~/.config/openstack-mcp-guarded/"
+                    "extend the policy file (~/.config/mcp-openstack/"
                     "policy.yaml) if write access is intended."
                 ),
             )

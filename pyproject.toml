@@ -1,5 +1,5 @@
 [project]
-name = "openstack-mcp-guarded"
+name = "mcp-openstack"
 version = "0.1.0"
 description = "OpenStack MCP server with server-side policy guardrails (read-only by default) - wrapper around python-openstackmcp-server"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-openstack-mcp-guarded = "openstack_mcp_guarded:main"
+mcp-openstack = "openstack_mcp_guarded:main"
 
 [dependency-groups]
 dev = [

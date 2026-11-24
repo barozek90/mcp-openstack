@@ -198,11 +198,11 @@ async def test_extra_write_hard_blocked(read_only_policy, cloud_selected):
     """Direct invocation of a new write tool must raise ToolError."""
     mcp = create_mcp(policy=read_only_policy)
     async with Client(mcp) as client:
-        with pytest.raises(ToolError, match="Blocked by openstack-mcp-guarded"):
+        with pytest.raises(ToolError, match="Blocked by mcp-openstack"):
             await client.call_tool(
                 "delete_load_balancer", {"load_balancer_id": "fake-uuid"}
             )
-        with pytest.raises(ToolError, match="Blocked by openstack-mcp-guarded"):
+        with pytest.raises(ToolError, match="Blocked by mcp-openstack"):
             await client.call_tool(
                 "delete_dns_zone", {"zone_id": "fake-uuid"}
             )
@@ -212,7 +212,7 @@ async def test_hard_block_write_tool(read_only_policy, cloud_selected):
     """Calling a hidden tool directly must fail with ToolError."""
     mcp = create_mcp(policy=read_only_policy)
     async with Client(mcp) as client:
-        with pytest.raises(ToolError, match="Blocked by openstack-mcp-guarded"):
+        with pytest.raises(ToolError, match="Blocked by mcp-openstack"):
             await client.call_tool("delete_server", {"id": "fake-uuid"})
 
 
@@ -220,7 +220,7 @@ async def test_hard_block_action_server(read_only_policy, cloud_selected):
     """action_server (start/stop/pause VMs) must be blocked too."""
     mcp = create_mcp(policy=read_only_policy)
     async with Client(mcp) as client:
-        with pytest.raises(ToolError, match="Blocked by openstack-mcp-guarded"):
+        with pytest.raises(ToolError, match="Blocked by mcp-openstack"):
             await client.call_tool(
                 "action_server", {"id": "fake-uuid", "action": "stop"}
             )
@@ -282,7 +282,7 @@ async def test_custom_mode_hard_blocks_denied_tool(cloud_selected):
     )
     mcp = create_mcp(policy=policy)
     async with Client(mcp) as client:
-        with pytest.raises(ToolError, match="Blocked by openstack-mcp-guarded"):
+        with pytest.raises(ToolError, match="Blocked by mcp-openstack"):
             await client.call_tool("delete_server", {"id": "fake-uuid"})
 
 

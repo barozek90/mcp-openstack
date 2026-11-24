@@ -74,7 +74,7 @@ def apply_config_dir(
         env.setdefault("OS_CLIENT_SECURE_FILE", str(secure))
         if secure.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO):
             _stderr(
-                f"[openstack-mcp-guarded] WARNING {secure} is accessible "
+                f"[mcp-openstack] WARNING {secure} is accessible "
                 f"by group/others; run 'chmod 600 {secure}'"
             )
     return directory

@@ -1,4 +1,4 @@
-# Repository rules (openstack-mcp-guarded)
+# Repository rules (mcp-openstack)
 
 ## Commits
 - Follow the `commit-helper` skill: Conventional Commits,

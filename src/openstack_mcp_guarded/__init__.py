@@ -1,4 +1,4 @@
-"""openstack-mcp-guarded.
+"""mcp-openstack.
 
 An OpenStack MCP server with server-level safety fuses: a policy
 layer that hides and hard-blocks non-read-only tools, regardless of

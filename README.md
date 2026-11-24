@@ -1,4 +1,4 @@
-# openstack-mcp-guarded
+# mcp-openstack
 
 Serwer MCP dla OpenStack z **bezpiecznikami na poziomie serwera** (read-only by default).
 
@@ -12,7 +12,7 @@ i twardym blokowaniem wywołań (`tools/call`) — niezależnie od klienta MCP
 ```bash
 uv sync
 uv run pytest          # testy
-uv run openstack-mcp-guarded   # serwer (stdio)
+uv run mcp-openstack   # serwer (stdio)
 ```
 
 ## Konfiguracja
@@ -25,7 +25,7 @@ uv run openstack-mcp-guarded   # serwer (stdio)
   Zmienna jest zużywana przy starcie, żeby openstacksdk nie utworzył fikcyjnej chmury `envvars`.
 - Chmura startowa: env `CLOUD_NAME` (nazwa dopasowywana bez rozróżniania wielkości liter;
   uwaga: serwer nie czyta `OS_CLOUD`).
-- Polityka: `~/.config/openstack-mcp-guarded/policy.yaml` (override: env `OS_MCP_GUARD_POLICY`)
+- Polityka: `~/.config/mcp-openstack/policy.yaml` (override: env `OS_MCP_GUARD_POLICY`)
 
 ```yaml
 mode: read-only        # read-only | custom
