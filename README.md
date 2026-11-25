@@ -35,4 +35,47 @@ allow:                 # globy fnmatch, tylko tryb custom
 deny: []               # wygrywa z allow
 ```
 
+## Listowanie per projekt / user / wszystkie projekty (admin)
+
+Bez argumentów `get_*` listują to samo co wcześniej (Nova, Cinder, Designate i Heat
+tylko projekt z tokena, Neutron wszystko, co widzi admin). Na konto admina dochodzą
+opcjonalne parametry:
+
+| Parametr | Znaczenie | Gdzie |
+|---|---|---|
+| `project` | nazwa **albo** ID projektu | serwery, wolumeny, załączniki, sieci/subnety/porty/routery/SG/floating IP, obrazy (właściciel), LB/listenery/pule/health monitory, strefy i recordsety DNS, stacki Heat, server groups |
+| `user` | nazwa albo ID usera | serwery, wolumeny, keypairs |
+| `all_projects` | zasoby wszystkich projektów | serwery, wolumeny, załączniki, strefy i recordsety DNS, stacki Heat, server groups |
+| `limit` | maks. liczba elementów (domyślnie 5000, `0` = bez limitu) | wszystkie powyższe |
+
+Nowe narzędzie `get_users` (filtry `name`, `domain_id`, `enabled`) pomaga znaleźć usera;
+`get_projects` ma filtry `name`, `domain_id`, `parent_id`, `enabled`. Starsze `project_id`
+w `get_subnets`, `get_routers`, `get_security_groups` i `get_floating_ips` nadal działa
+(tylko ID). `get_compute_quotas` i `get_dns_quota` przyjmują w `project_id` także nazwę.
+
+Wynik narzędzi z tej listy to obwiednia:
+
+```json
+{"total": 120, "returned": 100, "truncated": true, "limit": 100, "items": [ ... ]}
+```
+
+`total` to liczba wszystkich pasujących zasobów, `items` jest ucinane do `limit`.
+Elementy listy serwerów i wolumenów mają `project_id`, `user_id` oraz hosta
+(`compute_host`/`hypervisor_hostname`, `host`), a LB, listenery, pule i health monitory
+mają `project_id`.
+
+Przykłady (argumenty wywołania narzędzia):
+
+```text
+get_servers   {"project": "EXAMPLE-PROJECT"}
+get_servers   {"all_projects": true, "status": "ERROR", "limit": 50}
+get_volumes   {"user": "tester"}
+get_dns_zones {"all_projects": true}
+get_networks  {"project": "EXAMPLE-PROJECT"}
+```
+
+Uwagi: `project`/`user`/`all_projects` wymagają uprawnień admina po stronie chmury;
+nazwa projektu jest rozwiązywana przez Keystone (niejednoznaczna lub nieznana nazwa
+kończy się błędem). Stacki Heat spoza własnego projektu używają `global_tenant`.
+
 Pełna dokumentacja: `../openstack-mcp-setup.md`.

@@ -1,6 +1,6 @@
 # Tool catalogue — mcp-openstack
 
-> Full upstream catalogue: **135 tools** · visible in read-only mode: **66** · blocked: **69**
+> Full upstream catalogue: **136 tools** · visible in read-only mode: **67** · blocked: **69**
 
 Sources: upstream `python-openstackmcp-server` (compute, image, identity, network, block storage, session) + extra tools in this repo (Octavia load balancers, Designate DNS, ops/Heat).
 
@@ -12,15 +12,15 @@ Sources: upstream `python-openstackmcp-server` (compute, image, identity, networ
 |---|---|---|
 | `get_amphorae` | Load Balancer (Octavia) | List amphora instances (requires admin role). |
 | `get_attachment_details` | Block Storage | Get detailed information about a specific attachment. |
-| `get_attachments` | Block Storage | Get the list of attachments. |
+| `get_attachments` | Block Storage | List volume attachments (limit=0: no limit). |
 | `get_availability_zones` | Ops / Heat | List compute availability zones (detailed=True adds host info, admin only). |
 | `get_cloud_config` | Session | Provide cloud configuration with secrets masked of current user's config file. |
 | `get_cloud_name` | Session | Return the currently selected cloud name. |
 | `get_cloud_names` | Session | List available cloud configurations. |
-| `get_compute_quotas` | Ops / Heat | Get compute quotas for a project (optionally with usage). |
+| `get_compute_quotas` | Ops / Heat | Get compute quotas for a project (ID or name), optionally with usage. |
 | `get_compute_services` | Ops / Heat | List compute services (nova-compute, scheduler...) with status (admin only). |
 | `get_dns_limits` | DNS (Designate) | List Designate API limits. |
-| `get_dns_quota` | DNS (Designate) | Get Designate quotas for a project. |
+| `get_dns_quota` | DNS (Designate) | Get Designate quotas for a project (ID or name). |
 | `get_dns_recordset_detail` | DNS (Designate) | Get detailed information about a specific recordset. |
 | `get_dns_recordsets` | DNS (Designate) | List recordsets, optionally filtered by zone, type (A/AAAA/CNAME/MX/TXT/SRV/PTR/CAA/NS) or name. |
 | `get_dns_zone_detail` | DNS (Designate) | Get detailed information about a specific DNS zone. |
@@ -28,53 +28,54 @@ Sources: upstream `python-openstackmcp-server` (compute, image, identity, networ
 | `get_dns_zone_imports` | DNS (Designate) | List DNS zone import jobs. |
 | `get_dns_zone_nameservers` | DNS (Designate) | List nameservers assigned to a DNS zone. |
 | `get_dns_zone_transfer_requests` | DNS (Designate) | List DNS zone transfer requests. |
-| `get_dns_zones` | DNS (Designate) | List DNS zones with optional filters. |
+| `get_dns_zones` | DNS (Designate) | List DNS zones with optional filters (limit=0: no limit). |
 | `get_domain` | Identity | Get a domain. |
 | `get_domains` | Identity | Get the list of Identity domains. |
 | `get_flavors` | Compute | Get flavors (server hardware configurations). |
-| `get_floating_ips` | Network | Get the list of Floating IPs with optional filtering. |
-| `get_health_monitors` | Load Balancer (Octavia) | List health monitors, optionally filtered by pool. |
+| `get_floating_ips` | Network | List Floating IPs (limit=0: no limit). |
+| `get_health_monitors` | Load Balancer (Octavia) | List health monitors, optionally filtered by pool or project. |
 | `get_heat_stack_detail` | Ops / Heat | Get detailed information about a stack (incl. |
 | `get_heat_stack_events` | Ops / Heat | List events of a stack (optionally of a single resource). |
 | `get_heat_stack_resources` | Ops / Heat | List resources of a stack. |
 | `get_heat_stack_template` | Ops / Heat | Get the template of a stack. |
-| `get_heat_stacks` | Ops / Heat | List Heat stacks with optional status/name filters. |
+| `get_heat_stacks` | Ops / Heat | List Heat stacks with optional status/name filters (limit=0: no limit). |
 | `get_hypervisor_uptime` | Ops / Heat | Get uptime of a hypervisor (admin only). |
 | `get_hypervisors` | Ops / Heat | List hypervisors with CPU/memory/disk stats (admin only). |
 | `get_image` | Image | Get an OpenStack image by ID. |
-| `get_images` | Image | Get the list of OpenStack images with optional filtering. |
-| `get_keypairs` | Ops / Heat | List key pairs (optionally filter by name). |
+| `get_images` | Image | List Images (limit=0: no limit). |
+| `get_keypairs` | Ops / Heat | List key pairs of the current user (limit=0: no limit). |
 | `get_listener_statistics` | Load Balancer (Octavia) | Get traffic statistics for a specific listener. |
-| `get_listeners` | Load Balancer (Octavia) | List listeners, optionally filtered by load balancer or protocol. |
+| `get_listeners` | Load Balancer (Octavia) | List listeners, optionally filtered by load balancer, protocol or project. |
 | `get_load_balancer_detail` | Load Balancer (Octavia) | Get detailed information about a specific load balancer. |
 | `get_load_balancer_flavors` | Load Balancer (Octavia) | List load balancer flavors. |
 | `get_load_balancer_providers` | Load Balancer (Octavia) | List available load balancer providers (e.g. |
 | `get_load_balancer_statistics` | Load Balancer (Octavia) | Get traffic statistics (bytes, connections, errors) for a load balancer. |
-| `get_load_balancers` | Load Balancer (Octavia) | List load balancers with optional status/name filters. |
+| `get_load_balancers` | Load Balancer (Octavia) | List load balancers with optional status/name/project filters. |
 | `get_network_detail` | Network | Get detailed information about a specific Network. |
-| `get_networks` | Network | Get the list of Networks with optional filtering. |
+| `get_networks` | Network | List Networks (limit=0: no limit). |
 | `get_pool_members` | Load Balancer (Octavia) | List members of a specific pool. |
-| `get_pools` | Load Balancer (Octavia) | List pools, optionally filtered by load balancer or protocol. |
+| `get_pools` | Load Balancer (Octavia) | List pools, optionally filtered by load balancer, protocol or project. |
 | `get_port_allowed_address_pairs` | Network | Get allowed address pairs configured on a port. |
 | `get_port_detail` | Network | Get detailed information about a specific Port. |
-| `get_ports` | Network | Get the list of Ports with optional filtering. |
+| `get_ports` | Network | List Ports (limit=0: no limit). |
 | `get_project` | Identity | Get a project. |
-| `get_projects` | Identity | Get the list of Identity projects. |
+| `get_projects` | Identity | List Identity projects, optionally filtered (limit=0: no limit). |
 | `get_region` | Identity | Get a region. |
 | `get_regions` | Identity | Get the list of Identity regions. |
 | `get_router_detail` | Network | Get detailed information about a specific Router. |
 | `get_router_interfaces` | Network | List interfaces attached to a Router. |
-| `get_routers` | Network | Get the list of Routers with optional filtering. |
+| `get_routers` | Network | List Routers (limit=0: no limit). |
 | `get_security_group_detail` | Network | Get detailed information about a specific Security Group. |
-| `get_security_groups` | Network | Get the list of Security Groups with optional filtering. |
+| `get_security_groups` | Network | List Security Groups (limit=0: no limit). |
 | `get_server` | Compute | Get a specific Compute server. |
 | `get_server_actions` | Ops / Heat | List lifecycle actions/events of a server (audit trail). |
 | `get_server_groups` | Ops / Heat | List server groups (affinity/anti-affinity scheduling). |
-| `get_servers` | Compute | Get the list of Compute servers. |
+| `get_servers` | Compute | List Compute servers (limit=0: no limit). |
 | `get_subnet_detail` | Network | Get detailed information about a specific Subnet. |
-| `get_subnets` | Network | Get the list of Subnets with optional filtering. |
+| `get_subnets` | Network | List Subnets (limit=0: no limit). |
+| `get_users` | Identity | List Identity users, optionally filtered (limit=0: no limit). |
 | `get_volume_details` | Block Storage | Get detailed information about a specific volume. |
-| `get_volumes` | Block Storage | Get the list of Block Storage volumes. |
+| `get_volumes` | Block Storage | List Block Storage volumes (limit=0: no limit). |
 | `set_cloud_name` | Session | Set cloud name to use for later connections. |
 
 ---
