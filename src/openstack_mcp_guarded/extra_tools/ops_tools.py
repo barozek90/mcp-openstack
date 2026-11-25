@@ -121,7 +121,7 @@ class OpsTools:
     def get_compute_quotas(self, project_id: str, usage: bool = False) -> dict:
         """Get compute quotas for a project (optionally with usage)."""
         conn = get_openstack_conn()
-        quota = conn.compute.get_quota_set(project, usage=usage)
+        quota = conn.compute.get_quota_set(project_id, usage=usage)
         return _pick(
             quota,
             "instances", "cores", "ram", "floating_ips", "fixed_ips",
