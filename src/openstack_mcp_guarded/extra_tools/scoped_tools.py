@@ -22,7 +22,6 @@ from fastmcp import FastMCP
 
 from openstack_mcp_server.tools.base import get_openstack_conn
 from openstack_mcp_server.tools.network_tools import NetworkTools
-from openstack_mcp_server.tools.response.block_storage import Attachment
 from openstack_mcp_server.tools.response.compute import Server
 from openstack_mcp_server.tools.response.image import Image
 
@@ -39,6 +38,13 @@ _SERVER_EXTRA = (
     "project_id", "user_id", "compute_host", "hypervisor_hostname",
     "availability_zone", "created_at", "launched_at", "vm_state",
     "task_state",
+)
+
+# Connection details safe to show (upstream's ConnectionInfo allowlist).
+_CONNECTION_INFO_FIELDS = (
+    "access_mode", "cacheable", "driver_volume_type", "encrypted",
+    "qos_specs", "target_discovered", "target_iqn", "target_lun",
+    "target_portal",
 )
 
 _VOLUME_FIELDS = (
@@ -240,20 +246,22 @@ class ScopedListTools:
             query["volume_id"] = volume_id
         if instance:
             query["instance"] = instance
+        # Built by hand instead of through upstream's ``Attachment`` model:
+        # it types ``connection_info.qos_specs`` as a string, while Cinder
+        # returns a dict, so one such attachment failed the whole listing.
         items = []
         for att in conn.block_storage.attachments(**query):
-            item = Attachment(
-                id=att.id,
-                instance=att.instance,
-                volume_id=att.volume_id,
-                status=att.status,
-                connection_info=att.connection_info,
-                attach_mode=att.attach_mode,
-                connector=att.connector,
-                attached_at=att.attached_at,
-                detached_at=att.detached_at,
-            ).model_dump(mode="json", by_alias=True)
-            item["project_id"] = getattr(att, "project_id", None)
+            item = _pick(
+                att, "id", "instance", "volume_id", "status", "attach_mode",
+                "attached_at", "detached_at", "connector", "project_id",
+            )
+            info = getattr(att, "connection_info", None)
+            # Same allowlist as upstream's ConnectionInfo: no auth_* secrets.
+            item["connection_info"] = (
+                {key: info.get(key) for key in _CONNECTION_INFO_FIELDS}
+                if info
+                else None
+            )
             items.append(item)
         return envelope(items, limit)
 
