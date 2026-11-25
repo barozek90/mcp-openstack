@@ -13,6 +13,7 @@ from types import SimpleNamespace as NS
 
 import pytest
 from fastmcp import Client
+from openstack import exceptions as sdk_exceptions
 
 from openstack_mcp_guarded.extra_tools.helpers import (
     DEFAULT_LIMIT,
@@ -200,6 +201,13 @@ def test_envelope_rejects_negative_limit():
         envelope([], limit=-1)
 
 
+def test_envelope_carries_an_optional_note():
+    assert "note" not in envelope([1])
+    assert envelope([1], note="listed with the default scope")["note"] == (
+        "listed with the default scope"
+    )
+
+
 def test_resolve_project_id_passes_ids_without_lookup():
     conn = FakeConn()
     assert resolve_project_id(conn, PROJECT_ID) == PROJECT_ID
@@ -363,6 +371,34 @@ async def test_get_volumes_scoping_and_fields(conn, mcp):
 async def test_get_volumes_without_arguments(conn, mcp):
     await call(mcp, "get_volumes")
     assert conn.block_storage.kwargs("volumes") == {}
+
+
+async def test_get_attachments_accepts_dict_qos_specs_and_hides_secrets(
+    conn, mcp
+):
+    """Regression: upstream's model wanted a string for qos_specs."""
+    conn.block_storage.results["attachments"] = [
+        NS(
+            id="fake-uuid", instance="fake-uuid", volume_id="fake-uuid",
+            status="attached", attach_mode="rw",
+            attached_at="2026-01-01T00:00:00", detached_at=None,
+            connector={"host": "host-1.example"}, project_id=PROJECT_ID,
+            connection_info={
+                "driver_volume_type": "rbd",
+                "qos_specs": {"read_iops_sec": "500"},
+                "target_portal": None,
+                "auth_username": "tester",
+                "secret_uuid": "fake-uuid",
+            },
+        )
+    ]
+    out = await call(mcp, "get_attachments", all_projects=True)
+    assert conn.block_storage.kwargs("attachments") == {"all_projects": True}
+    item = out["items"][0]
+    assert item["project_id"] == PROJECT_ID
+    assert item["connection_info"]["qos_specs"] == {"read_iops_sec": "500"}
+    assert "auth_username" not in item["connection_info"]
+    assert "secret_uuid" not in item["connection_info"]
 
 
 async def test_get_keypairs_by_user_filters_name_client_side(conn, mcp):
@@ -640,6 +676,64 @@ async def test_get_heat_stacks_by_project_sends_tenant(conn, mcp):
     params = conn.orchestration.kwargs("get")["params"]
     assert params["global_tenant"] == "true"
     assert params["tenant"] == PROJECT_ID
+
+
+def _forbid_global_tenant(rows):
+    """``get`` stub: 403 for global_tenant listings, ``rows`` otherwise."""
+
+    def get(path, params=None, headers=None):
+        if "global_tenant" in params:
+            raise sdk_exceptions.ForbiddenException("not authorized")
+        return FakeResponse({"stacks": rows})
+
+    return get
+
+
+_STACKS = [
+    {"id": "fake-uuid-1", "stack_name": "mine",
+     "stack_status": "CREATE_COMPLETE", "project": PROJECT_ID},
+    {"id": "fake-uuid-2", "stack_name": "theirs",
+     "stack_status": "CREATE_COMPLETE", "project": OTHER_PROJECT_ID},
+]
+
+
+async def test_get_heat_stacks_project_falls_back_when_global_is_denied(
+    conn, mcp
+):
+    """Regression: a 403 on stacks:global_index used to fail the tool."""
+    conn.orchestration.results["get"] = _forbid_global_tenant(_STACKS)
+    out = await call(mcp, "get_heat_stacks", project="demo")
+
+    assert [s["stack_name"] for s in out["items"]] == ["mine"]
+    assert "stacks:global_index" in out["note"]
+    assert "Filtered by project" in out["note"]
+    sent = [
+        kwargs["params"]
+        for name, _args, kwargs in conn.orchestration.calls
+        if name == "get"
+    ]
+    assert "global_tenant" in sent[0]
+    assert "global_tenant" not in sent[1]
+
+
+async def test_get_heat_stacks_all_projects_falls_back_unfiltered(conn, mcp):
+    conn.orchestration.results["get"] = _forbid_global_tenant(_STACKS)
+    out = await call(mcp, "get_heat_stacks", all_projects=True)
+
+    assert out["total"] == 2
+    assert "default scope" in out["note"]
+    assert "Filtered" not in out["note"]
+
+
+async def test_get_heat_stacks_fallback_without_project_field_is_not_filtered(
+    conn, mcp
+):
+    rows = [{"id": "fake-uuid-1", "stack_name": "unknown-owner"}]
+    conn.orchestration.results["get"] = _forbid_global_tenant(rows)
+    out = await call(mcp, "get_heat_stacks", project="demo")
+
+    assert out["total"] == 1
+    assert "not filtered by project" in out["note"]
 
 
 # ---------------------------------------------------------------------------
