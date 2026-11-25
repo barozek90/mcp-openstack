@@ -55,6 +55,23 @@ TOOL_CLASSES = [
 ]
 
 
+# Scoped list tools take over upstream names (server registers them with
+# on_duplicate="replace"). They keep the category of the tool they replace;
+# tools without an upstream twin fall back to this category.
+SCOPED_CLASS = (
+    "openstack_mcp_guarded.extra_tools.scoped_tools",
+    "ScopedListTools",
+)
+SCOPED_FALLBACK_CATEGORY = "Identity"
+
+
+async def _list_tools(cls: type) -> list:
+    mcp = FastMCP("catalogue")
+    cls().register_tools(mcp)
+    async with Client(mcp) as client:
+        return await client.list_tools()
+
+
 async def catalogue() -> dict[str, dict[str, str]]:
     """Return {tool_name: {category, description}} from upstream classes."""
     import importlib
@@ -63,14 +80,22 @@ async def catalogue() -> dict[str, dict[str, str]]:
     for category, module_name, class_name in TOOL_CLASSES:
         module = importlib.import_module(module_name)
         cls = getattr(module, class_name)
-        mcp = FastMCP("catalogue")
-        cls().register_tools(mcp)
-        async with Client(mcp) as client:
-            for tool in await client.list_tools():
-                result[tool.name] = {
-                    "category": category,
-                    "description": (tool.description or "").strip(),
-                }
+        for tool in await _list_tools(cls):
+            result[tool.name] = {
+                "category": category,
+                "description": (tool.description or "").strip(),
+            }
+
+    module_name, class_name = SCOPED_CLASS
+    scoped_cls = getattr(importlib.import_module(module_name), class_name)
+    for tool in await _list_tools(scoped_cls):
+        previous = result.get(tool.name)
+        result[tool.name] = {
+            "category": (
+                previous["category"] if previous else SCOPED_FALLBACK_CATEGORY
+            ),
+            "description": (tool.description or "").strip(),
+        }
     return result
 
 

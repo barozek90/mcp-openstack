@@ -51,13 +51,22 @@ def create_mcp(policy: Policy | None = None) -> FastMCP:
     # compat.py), but applied as early as possible on principle.
     patch_upstream_quirks()
 
-    mcp = FastMCP("openstack_mcp_guarded")
+    # "replace": the scoped list tools below intentionally take over the
+    # names of their upstream twins (get_servers, get_volumes, ...).
+    mcp = FastMCP("openstack_mcp_guarded", on_duplicate="replace")
 
     # Upstream tools (compute, image, identity, network, block storage,
     # connection/cloud session) registered into OUR instance.
     from openstack_mcp_server.tools import register_tool
 
     register_tool(mcp)
+
+    # Admin-friendly versions of upstream get_* tools: same names, extra
+    # project / user / all_projects / limit parameters. Registered right
+    # after upstream so they win the name.
+    from openstack_mcp_guarded.extra_tools.scoped_tools import ScopedListTools
+
+    ScopedListTools().register_tools(mcp)
 
     # Extra tools missing from upstream: Octavia (load balancers),
     # Designate (DNS), and ops/heat (keypairs, server groups, AZs,

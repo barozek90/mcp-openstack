@@ -14,13 +14,7 @@ from fastmcp import FastMCP
 
 from openstack_mcp_server.tools.base import get_openstack_conn
 
-
-def _pick(obj: Any, *fields: str) -> dict[str, Any]:
-    """Project selected attributes of an SDK resource into a dict."""
-    out: dict[str, Any] = {}
-    for f in fields:
-        out[f] = getattr(obj, f, None)
-    return out
+from .helpers import DEFAULT_LIMIT, _pick, envelope, resolve_project_id
 
 
 def _lb_ref(lb: Any) -> list[str]:
@@ -67,8 +61,14 @@ class OctaviaTools:
         provisioning_status: str | None = None,
         operating_status: str | None = None,
         name: str | None = None,
-    ) -> list[dict]:
-        """List load balancers with optional status/name filters."""
+        project: str | None = None,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List load balancers with optional status/name/project filters.
+
+        ``project`` is a project name or ID; every item carries its
+        project_id. limit=0 means no limit.
+        """
         conn = get_openstack_conn()
         query: dict[str, Any] = {}
         if provisioning_status:
@@ -77,16 +77,23 @@ class OctaviaTools:
             query["operating_status"] = operating_status.upper()
         if name:
             query["name"] = name
-        return [
-            _pick(
-                lb,
-                "id", "name", "description", "operating_status",
-                "provisioning_status", "vip_address", "vip_network_id",
-                "vip_subnet_id", "provider", "flavor_id", "created_at",
-                "updated_at", "tags",
-            )
-            for lb in conn.load_balancer.load_balancers(**query)
-        ]
+        project_id = resolve_project_id(conn, project)
+        if project_id:
+            query["project_id"] = project_id
+        return envelope(
+            (
+                _pick(
+                    lb,
+                    "id", "name", "description", "project_id",
+                    "operating_status", "provisioning_status",
+                    "vip_address", "vip_network_id", "vip_subnet_id",
+                    "provider", "flavor_id", "created_at", "updated_at",
+                    "tags",
+                )
+                for lb in conn.load_balancer.load_balancers(**query)
+            ),
+            limit,
+        )
 
     def get_load_balancer_detail(self, load_balancer_id: str) -> dict:
         """Get detailed information about a specific load balancer."""
@@ -96,7 +103,7 @@ class OctaviaTools:
         )
         return _pick(
             lb,
-            "id", "name", "description", "operating_status",
+            "id", "name", "description", "project_id", "operating_status",
             "provisioning_status", "vip_address", "vip_port_id",
             "vip_network_id", "vip_subnet_id", "provider", "flavor_id",
             "admin_state_up", "created_at", "updated_at", "tags",
@@ -117,25 +124,37 @@ class OctaviaTools:
         self,
         load_balancer_id: str | None = None,
         protocol: str | None = None,
-    ) -> list[dict]:
-        """List listeners, optionally filtered by load balancer or protocol."""
+        project: str | None = None,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List listeners, optionally filtered by load balancer, protocol or project.
+
+        ``project`` is a project name or ID. limit=0 means no limit.
+        """
         conn = get_openstack_conn()
         query: dict[str, Any] = {}
         if load_balancer_id:
             query["load_balancer_id"] = load_balancer_id
         if protocol:
             query["protocol"] = protocol.upper()
-        return [
-            _pick(
-                lst,
-                "id", "name", "description", "protocol", "protocol_port",
-                "operating_status", "provisioning_status",
-                "default_pool_id", "connection_limit",
-                "insert_headers", "created_at", "updated_at",
-            )
-            | {"load_balancers": _lb_ref(lst)}
-            for lst in conn.load_balancer.listeners(**query)
-        ]
+        project_id = resolve_project_id(conn, project)
+        if project_id:
+            query["project_id"] = project_id
+        return envelope(
+            (
+                _pick(
+                    lst,
+                    "id", "name", "description", "project_id", "protocol",
+                    "protocol_port", "operating_status",
+                    "provisioning_status", "default_pool_id",
+                    "connection_limit", "insert_headers", "created_at",
+                    "updated_at",
+                )
+                | {"load_balancers": _lb_ref(lst)}
+                for lst in conn.load_balancer.listeners(**query)
+            ),
+            limit,
+        )
 
     def get_listener_statistics(self, listener_id: str) -> dict:
         """Get traffic statistics for a specific listener."""
@@ -150,24 +169,36 @@ class OctaviaTools:
         self,
         load_balancer_id: str | None = None,
         protocol: str | None = None,
-    ) -> list[dict]:
-        """List pools, optionally filtered by load balancer or protocol."""
+        project: str | None = None,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List pools, optionally filtered by load balancer, protocol or project.
+
+        ``project`` is a project name or ID. limit=0 means no limit.
+        """
         conn = get_openstack_conn()
         query: dict[str, Any] = {}
         if load_balancer_id:
             query["load_balancer_id"] = load_balancer_id
         if protocol:
             query["protocol"] = protocol.upper()
-        return [
-            _pick(
-                pool,
-                "id", "name", "description", "protocol", "lb_algorithm",
-                "operating_status", "provisioning_status",
-                "healthmonitor_id", "session_persistence", "created_at",
-            )
-            | {"load_balancers": _lb_ref(pool)}
-            for pool in conn.load_balancer.pools(**query)
-        ]
+        project_id = resolve_project_id(conn, project)
+        if project_id:
+            query["project_id"] = project_id
+        return envelope(
+            (
+                _pick(
+                    pool,
+                    "id", "name", "description", "project_id", "protocol",
+                    "lb_algorithm", "operating_status",
+                    "provisioning_status", "healthmonitor_id",
+                    "session_persistence", "created_at",
+                )
+                | {"load_balancers": _lb_ref(pool)}
+                for pool in conn.load_balancer.pools(**query)
+            ),
+            limit,
+        )
 
     def get_pool_members(self, pool_id: str) -> list[dict]:
         """List members of a specific pool."""
@@ -185,22 +216,33 @@ class OctaviaTools:
     def get_health_monitors(
         self,
         pool_id: str | None = None,
-    ) -> list[dict]:
-        """List health monitors, optionally filtered by pool."""
+        project: str | None = None,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List health monitors, optionally filtered by pool or project.
+
+        ``project`` is a project name or ID. limit=0 means no limit.
+        """
         conn = get_openstack_conn()
         query: dict[str, Any] = {}
         if pool_id:
             query["pool_id"] = pool_id
-        return [
-            _pick(
-                hm,
-                "id", "name", "type", "delay", "timeout", "max_retries",
-                "max_retries_down", "http_method", "url_path",
-                "expected_codes", "operating_status",
-                "provisioning_status", "admin_state_up", "pools",
-            )
-            for hm in conn.load_balancer.health_monitors(**query)
-        ]
+        project_id = resolve_project_id(conn, project)
+        if project_id:
+            query["project_id"] = project_id
+        return envelope(
+            (
+                _pick(
+                    hm,
+                    "id", "name", "project_id", "type", "delay", "timeout",
+                    "max_retries", "max_retries_down", "http_method",
+                    "url_path", "expected_codes", "operating_status",
+                    "provisioning_status", "admin_state_up", "pools",
+                )
+                for hm in conn.load_balancer.health_monitors(**query)
+            ),
+            limit,
+        )
 
     def get_load_balancer_providers(self) -> list[dict]:
         """List available load balancer providers (e.g. amphora, ovn)."""

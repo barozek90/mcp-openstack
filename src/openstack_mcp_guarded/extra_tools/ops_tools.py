@@ -15,7 +15,14 @@ from fastmcp import FastMCP
 
 from openstack_mcp_server.tools.base import get_openstack_conn
 
-from .helpers import _pick
+from .helpers import (
+    DEFAULT_LIMIT,
+    _pick,
+    envelope,
+    paged_get,
+    resolve_project_id,
+    resolve_user_id,
+)
 
 
 class OpsTools:
@@ -50,24 +57,65 @@ class OpsTools:
     # read: compute ops
     # ------------------------------------------------------------------
 
-    def get_keypairs(self, name: str | None = None) -> list[dict]:
-        """List key pairs (optionally filter by name)."""
+    def get_keypairs(
+        self,
+        name: str | None = None,
+        user: str | None = None,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List key pairs of the current user (limit=0: no limit).
+
+        ``user`` (name or ID) lists that user's key pairs instead (admin).
+        ``name`` filters by exact name.
+        """
         conn = get_openstack_conn()
         query: dict[str, Any] = {}
-        if name:
-            query["name"] = name
-        return [
-            _pick(k, "id", "name", "fingerprint", "type", "created_at")
-            for k in conn.compute.keypairs(**query)
-        ]
+        user_id = resolve_user_id(conn, user)
+        if user_id:
+            query["user_id"] = user_id
+        # Nova has no server-side name filter for keypairs: filter here.
+        return envelope(
+            (
+                _pick(
+                    k, "id", "name", "fingerprint", "type", "user_id",
+                    "created_at",
+                )
+                for k in conn.compute.keypairs(**query)
+                if not name or getattr(k, "name", None) == name
+            ),
+            limit,
+        )
 
-    def get_server_groups(self) -> list[dict]:
-        """List server groups (affinity/anti-affinity scheduling)."""
+    def get_server_groups(
+        self,
+        project: str | None = None,
+        all_projects: bool = False,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List server groups (affinity/anti-affinity scheduling).
+
+        Without arguments only the current token's project is listed.
+        ``project`` (name or ID) keeps one project's groups,
+        ``all_projects=True`` lists every project's (admin).
+        limit=0 means no limit.
+        """
         conn = get_openstack_conn()
-        return [
-            _pick(g, "id", "name", "policies", "members", "project_id", "user_id")
-            for g in conn.compute.server_groups()
-        ]
+        project_id = resolve_project_id(conn, project)
+        query: dict[str, Any] = {}
+        if all_projects or project_id:
+            query["all_projects"] = True
+        # Nova can only widen the scope (all_projects); narrow it down here.
+        return envelope(
+            (
+                _pick(
+                    g, "id", "name", "policies", "members", "project_id",
+                    "user_id",
+                )
+                for g in conn.compute.server_groups(**query)
+                if not project_id or getattr(g, "project_id", None) == project_id
+            ),
+            limit,
+        )
 
     def get_availability_zones(self, detailed: bool = False) -> list[dict]:
         """List compute availability zones (detailed=True adds host info, admin only)."""
@@ -119,9 +167,11 @@ class OpsTools:
         ]
 
     def get_compute_quotas(self, project_id: str, usage: bool = False) -> dict:
-        """Get compute quotas for a project (optionally with usage)."""
+        """Get compute quotas for a project (ID or name), optionally with usage."""
         conn = get_openstack_conn()
-        quota = conn.compute.get_quota_set(project_id, usage=usage)
+        quota = conn.compute.get_quota_set(
+            resolve_project_id(conn, project_id), usage=usage
+        )
         return _pick(
             quota,
             "instances", "cores", "ram", "floating_ips", "fixed_ips",
@@ -150,23 +200,50 @@ class OpsTools:
         self,
         status: str | None = None,
         name: str | None = None,
-    ) -> list[dict]:
-        """List Heat stacks with optional status/name filters."""
+        project: str | None = None,
+        all_projects: bool = False,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List Heat stacks with optional status/name filters (limit=0: no limit).
+
+        Without ``project``/``all_projects`` only the current token's
+        project is listed. ``project`` (name or ID) or ``all_projects=True``
+        use Heat's ``global_tenant`` listing (admin).
+        """
         conn = get_openstack_conn()
-        query: dict[str, Any] = {}
+        project_id = resolve_project_id(conn, project)
+        params: dict[str, Any] = {}
         if status:
-            query["status"] = status.upper()
+            params["status"] = status.upper()
         if name:
-            query["name"] = name
-        return [
-            _pick(
-                s,
-                "id", "stack_name", "stack_status", "stack_status_reason",
-                "description", "creation_time", "updated_time",
-                "tags", "project_id",
-            )
-            for s in conn.orchestration.stacks(**query)
-        ]
+            params["name"] = name
+        if all_projects or project_id:
+            params["global_tenant"] = "true"
+            if project_id:
+                params["tenant"] = project_id
+        # Raw listing instead of ``conn.orchestration.stacks()``: the SDK
+        # does not know ``global_tenant``, and its Stack resource exposes
+        # the Heat fields under other names (name, status, created_at...),
+        # which used to leave every field but the ID empty.
+        return envelope(
+            (
+                {
+                    "id": row.get("id"),
+                    "stack_name": row.get("stack_name"),
+                    "stack_status": row.get("stack_status"),
+                    "stack_status_reason": row.get("stack_status_reason"),
+                    "description": row.get("description"),
+                    "creation_time": row.get("creation_time"),
+                    "updated_time": row.get("updated_time"),
+                    "tags": row.get("tags"),
+                    "project_id": row.get("project"),
+                }
+                for row in paged_get(
+                    conn.orchestration, "/stacks", "stacks", params=params
+                )
+            ),
+            limit,
+        )
 
     def get_heat_stack_detail(self, stack_id: str) -> dict:
         """Get detailed information about a stack (incl. outputs)."""

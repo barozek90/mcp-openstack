@@ -8,13 +8,59 @@ hard-blocked by default.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 from fastmcp import FastMCP
+from openstack.dns.v2.recordset import Recordset
 
 from openstack_mcp_server.tools.base import get_openstack_conn
 
-from .helpers import _pick
+from .helpers import (
+    DEFAULT_LIMIT,
+    _pick,
+    envelope,
+    paged_get,
+    resolve_project_id,
+)
+
+
+def _dns_scope(
+    conn: Any, project: str | None, all_projects: bool
+) -> dict[str, Any]:
+    """Scoping kwargs for ``conn.dns.zones()``/``recordsets()``.
+
+    The SDK turns ``project_id`` into ``X-Auth-Sudo-Project-Id`` and
+    ``all_projects`` into ``X-Auth-All-Projects`` (both admin only).
+    Without either, Designate sticks to the token's own project.
+    """
+    scope: dict[str, Any] = {}
+    project_id = resolve_project_id(conn, project)
+    if project_id:
+        scope["project_id"] = project_id
+    if all_projects:
+        scope["all_projects"] = True
+    return scope
+
+
+def _list_recordsets_without_zone(
+    conn: Any, query: dict[str, Any], scope: dict[str, Any]
+) -> Iterator[Recordset]:
+    """List ``/v2/recordsets`` (all zones of the scoped project(s)).
+
+    ``conn.dns.recordsets()`` without a zone fails inside the SDK: the
+    Designate resource base class drops the ``/recordsets`` base path
+    (``KeyError: 'zone_id'``), so the listing is paged by hand.
+    """
+    headers: dict[str, str] = {}
+    if scope.get("project_id"):
+        headers["x-auth-sudo-project-id"] = scope["project_id"]
+    if scope.get("all_projects"):
+        headers["x-auth-all-projects"] = "True"
+    for row in paged_get(
+        conn.dns, "/recordsets", "recordsets", params=query, headers=headers
+    ):
+        yield Recordset.existing(**row)
 
 
 class DesignateTools:
@@ -49,8 +95,16 @@ class DesignateTools:
         name: str | None = None,
         zone_type: str | None = None,
         status: str | None = None,
-    ) -> list[dict]:
-        """List DNS zones with optional filters."""
+        project: str | None = None,
+        all_projects: bool = False,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List DNS zones with optional filters (limit=0: no limit).
+
+        Without ``project``/``all_projects`` only the zones of the current
+        token's project are listed. ``project`` (name or ID) lists that
+        project's zones, ``all_projects=True`` every project's (admin).
+        """
         conn = get_openstack_conn()
         query: dict[str, Any] = {}
         if name:
@@ -59,16 +113,20 @@ class DesignateTools:
             query["type"] = zone_type.upper()
         if status:
             query["status"] = status.upper()
-        return [
-            _pick(
-                z,
-                "id", "name", "description", "type", "status", "action",
-                "serial", "email", "ttl", "masters", "attributes",
-                "transferred_at", "version", "created_at", "updated_at",
-                "project_id", "pool_id",
-            )
-            for z in conn.dns.zones(**query)
-        ]
+        query.update(_dns_scope(conn, project, all_projects))
+        return envelope(
+            (
+                _pick(
+                    z,
+                    "id", "name", "description", "type", "status", "action",
+                    "serial", "email", "ttl", "masters", "attributes",
+                    "transferred_at", "version", "created_at", "updated_at",
+                    "project_id", "pool_id",
+                )
+                for z in conn.dns.zones(**query)
+            ),
+            limit,
+        )
 
     def get_dns_zone_detail(self, zone_id: str) -> dict:
         """Get detailed information about a specific DNS zone."""
@@ -94,23 +152,40 @@ class DesignateTools:
         zone_id: str | None = None,
         record_type: str | None = None,
         name: str | None = None,
-    ) -> list[dict]:
-        """List recordsets, optionally filtered by zone, type (A/AAAA/CNAME/MX/TXT/SRV/PTR/CAA/NS) or name."""
+        project: str | None = None,
+        all_projects: bool = False,
+        limit: int = DEFAULT_LIMIT,
+    ) -> dict:
+        """List recordsets, optionally filtered by zone, type (A/AAAA/CNAME/MX/TXT/SRV/PTR/CAA/NS) or name.
+
+        Without ``project``/``all_projects`` only the current token's
+        project is searched. ``project`` (name or ID) or ``all_projects=True``
+        (admin) reach recordsets, and zones given as ``zone_id``, of other
+        projects. limit=0 means no limit.
+        """
         conn = get_openstack_conn()
         query: dict[str, Any] = {}
         if record_type:
             query["type"] = record_type.upper()
         if name:
             query["name"] = name
-        return [
-            _pick(
-                rs,
-                "id", "zone_id", "zone_name", "name", "type", "records",
-                "description", "ttl", "status", "action", "created_at",
-                "updated_at", "version",
-            )
-            for rs in conn.dns.recordsets(zone=zone_id, **query)
-        ]
+        scope = _dns_scope(conn, project, all_projects)
+        if zone_id:
+            recordsets = conn.dns.recordsets(zone=zone_id, **query, **scope)
+        else:
+            recordsets = _list_recordsets_without_zone(conn, query, scope)
+        return envelope(
+            (
+                _pick(
+                    rs,
+                    "id", "zone_id", "zone_name", "name", "type", "records",
+                    "description", "ttl", "status", "action", "created_at",
+                    "updated_at", "version", "project_id",
+                )
+                for rs in recordsets
+            ),
+            limit,
+        )
 
     def get_dns_recordset_detail(self, zone_id: str, recordset_id: str) -> dict:
         """Get detailed information about a specific recordset."""
@@ -160,9 +235,9 @@ class DesignateTools:
         ]
 
     def get_dns_quota(self, project_id: str) -> dict:
-        """Get Designate quotas for a project."""
+        """Get Designate quotas for a project (ID or name)."""
         conn = get_openstack_conn()
-        quota = conn.dns.get_quota(project_id)
+        quota = conn.dns.get_quota(resolve_project_id(conn, project_id))
         return _pick(
             quota,
             "zones", "recordset_records", "zone_records", "zone_recordsets",
