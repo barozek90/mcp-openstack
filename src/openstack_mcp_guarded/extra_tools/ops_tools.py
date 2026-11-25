@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastmcp import FastMCP
+from openstack import exceptions
 
 from openstack_mcp_server.tools.base import get_openstack_conn
 
@@ -206,9 +207,12 @@ class OpsTools:
     ) -> dict:
         """List Heat stacks with optional status/name filters (limit=0: no limit).
 
-        Without ``project``/``all_projects`` only the current token's
-        project is listed. ``project`` (name or ID) or ``all_projects=True``
-        use Heat's ``global_tenant`` listing (admin).
+        Without ``project``/``all_projects`` Heat's default scope applies
+        (for an admin it may already cover other projects: check each
+        item's project_id). ``project`` (name or ID) or ``all_projects=True``
+        ask for Heat's ``global_tenant`` listing; when the cloud forbids it
+        (policy ``stacks:global_index``) the default listing is used instead
+        (filtered by ``project`` here) and the result carries a ``note``.
         """
         conn = get_openstack_conn()
         project_id = resolve_project_id(conn, project)
@@ -217,14 +221,43 @@ class OpsTools:
             params["status"] = status.upper()
         if name:
             params["name"] = name
-        if all_projects or project_id:
-            params["global_tenant"] = "true"
-            if project_id:
-                params["tenant"] = project_id
+
         # Raw listing instead of ``conn.orchestration.stacks()``: the SDK
         # does not know ``global_tenant``, and its Stack resource exposes
         # the Heat fields under other names (name, status, created_at...),
         # which used to leave every field but the ID empty.
+        rows: list[dict[str, Any]] | None = None
+        note: str | None = None
+        if all_projects or project_id:
+            scoped = dict(params, global_tenant="true")
+            if project_id:
+                scoped["tenant"] = project_id
+            try:
+                rows = list(
+                    paged_get(
+                        conn.orchestration, "/stacks", "stacks", params=scoped
+                    )
+                )
+            except exceptions.ForbiddenException:
+                note = (
+                    "Heat refused the global_tenant listing (policy "
+                    "stacks:global_index); listed with the default scope "
+                    "of this token instead."
+                )
+        if rows is None:
+            rows = list(
+                paged_get(conn.orchestration, "/stacks", "stacks", params=params)
+            )
+            if project_id:
+                if any("project" in row for row in rows):
+                    rows = [r for r in rows if r.get("project") == project_id]
+                    note = (note or "") + " Filtered by project here."
+                else:
+                    note = (note or "") + (
+                        " The response has no project field, so the list is"
+                        " not filtered by project."
+                    )
+            note = note.strip() if note else note
         return envelope(
             (
                 {
@@ -238,11 +271,10 @@ class OpsTools:
                     "tags": row.get("tags"),
                     "project_id": row.get("project"),
                 }
-                for row in paged_get(
-                    conn.orchestration, "/stacks", "stacks", params=params
-                )
+                for row in rows
             ),
             limit,
+            note=note,
         )
 
     def get_heat_stack_detail(self, stack_id: str) -> dict:

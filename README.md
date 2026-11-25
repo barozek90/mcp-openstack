@@ -76,6 +76,9 @@ get_networks  {"project": "EXAMPLE-PROJECT"}
 
 Uwagi: `project`/`user`/`all_projects` wymagają uprawnień admina po stronie chmury;
 nazwa projektu jest rozwiązywana przez Keystone (niejednoznaczna lub nieznana nazwa
-kończy się błędem). Stacki Heat spoza własnego projektu używają `global_tenant`.
+kończy się błędem). Stacki Heat spoza własnego projektu są listowane przez
+`global_tenant`; gdy chmura tego zabrania (polityka `stacks:global_index`), narzędzie
+zwraca zwykłą listę Heat (dla admina bywa, że obejmuje już inne projekty), filtruje ją
+po `project` i dodaje do wyniku pole `note`.
 
 Pełna dokumentacja: `../openstack-mcp-setup.md`.

@@ -46,25 +46,31 @@ def _plain(item: Any) -> Any:
 def envelope(
     items: Iterable[Any],
     limit: int | None = DEFAULT_LIMIT,
+    note: str | None = None,
 ) -> dict[str, Any]:
     """Wrap a listing into ``{total, returned, truncated, limit, items}``.
 
     ``total`` counts every matched item (the SDK paginates in the
     background), ``items`` is cut to ``limit``. ``limit=0`` means no cap;
-    ``None`` falls back to :data:`DEFAULT_LIMIT`.
+    ``None`` falls back to :data:`DEFAULT_LIMIT`. A ``note`` is added as an
+    extra key when the listing differs from what was asked for (for example
+    a scope the cloud refused).
     """
     cap = DEFAULT_LIMIT if limit is None else limit
     if cap < 0:
         raise ValueError("limit must be >= 0 (0 means no limit)")
     rows = list(items)
     kept = rows[:cap] if cap else rows
-    return {
+    result: dict[str, Any] = {
         "total": len(rows),
         "returned": len(kept),
         "truncated": len(kept) < len(rows),
         "limit": cap or None,
         "items": [_plain(row) for row in kept],
     }
+    if note:
+        result["note"] = note
+    return result
 
 
 def paged_get(
