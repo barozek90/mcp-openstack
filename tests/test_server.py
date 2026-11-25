@@ -123,11 +123,17 @@ async def test_read_only_hides_write_tools(read_only_policy, no_cloud):
 
 
 async def test_read_only_visible_count(read_only_policy, no_cloud):
-    """28 upstream read + 4 session + 34 extra read = 66 visible."""
+    """28 upstream read + 4 session + 35 extra read = 67 visible.
+
+    The scoped list tools replace their upstream twins by name, so only
+    get_users adds to the count.
+    """
     mcp = create_mcp(policy=read_only_policy)
     async with Client(mcp) as client:
         tools = await client.list_tools()
-    assert len(tools) == 66
+    assert len(tools) == 67
+    names = [t.name for t in tools]
+    assert len(names) == len(set(names)), "duplicate tool names"
 
 
 async def test_extra_read_tools_visible(read_only_policy, no_cloud):
@@ -151,6 +157,7 @@ async def test_extra_read_tools_visible(read_only_policy, no_cloud):
         "get_dns_recordset_detail",
         "get_keypairs",
         "get_server_groups",
+        "get_users",
         "get_availability_zones",
         "get_hypervisors",
         "get_compute_services",
